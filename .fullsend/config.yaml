@@ -18,5 +18,5 @@ create_issues:
             - jasonawant/new-uie-fullsend-onboarding-test
             - fullsend-ai/fullsend
 inference:
-    project: firefly-868139
-    wif_provider: projects/275116376890/locations/global/workloadIdentityPools/uie-github-fullsend-inference/providers/gh-repo-1438686685
+    project: "275116376890"
+    wif_provider: projects/275116376890/locations/global/workloadIdentityPools/uie-github-fullsend-inference/providers/gh-repo-1407777876
