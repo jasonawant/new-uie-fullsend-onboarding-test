@@ -53,7 +53,7 @@ def otlp_attributes(values):
 
 
 def add_filterable_context(values):
-    for key in ("project_key", "cost_center", "github.repository", "github.run_id"):
+    for key in ("project_key", "cost_center", "team", "github.repository", "github.run_id"):
         if values.get(key):
             name = key.replace(".", "_")
             for level in ("trace", "observation"):
@@ -61,6 +61,7 @@ def add_filterable_context(values):
     tags = [f"{label}:{values[key]}" for key, label in (
         ("gen_ai.agent.name", "stage"),
         ("project_key", "project_key"), ("cost_center", "cost_center"),
+        ("team", "team"),
         ("github.repository", "repo"),
     ) if values.get(key)]
     if tags:
@@ -239,6 +240,12 @@ def main(argv=None):
                           ("SOURCE_ACTOR", "user.id")):
         if os.environ.get(env_key):
             context[attr] = os.environ[env_key]
+    if not context.get("team"):
+        env_team = os.environ.get("FULLSEND_TEAM") or os.environ.get("JIRA_TEAM")
+        if env_team and env_team.strip().lower() not in ("unassigned", "none", "null", ""):
+            context["team"] = env_team.strip()
+    elif context.get("team") and context["team"].strip().lower() in ("unassigned", "none", "null", ""):
+        context.pop("team", None)
     if context.get("github.run_id"):
         context["session.id"] = context["langfuse.session.id"] = context["github.run_id"]
     if context.get("user.id"):
