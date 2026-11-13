@@ -50,6 +50,10 @@ jobs:
           OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT }}
           OTEL_EXPORTER_OTLP_TRACES_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_TRACES_HEADERS }}
           OTEL_RESOURCE_ATTRIBUTES: ${{ vars.OTEL_RESOURCE_ATTRIBUTES }}
+          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          FULLSEND_JIRA_TEAM_FIELD: ${{ vars.FULLSEND_JIRA_TEAM_FIELD }}
           SOURCE_RUN_ID: ${{ github.event.workflow_run.id || github.run_id }}
           SOURCE_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt || github.run_attempt }}
           SOURCE_ACTOR: ${{ github.event.workflow_run.actor.login || github.actor }}
