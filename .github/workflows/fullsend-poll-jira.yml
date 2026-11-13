@@ -8,12 +8,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  actions: write
-  contents: write
-  id-token: write
-  issues: write
-  packages: read
-  pull-requests: write
+  contents: read
 
 jobs:
   poll:
@@ -41,6 +36,7 @@ jobs:
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
           JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+          FULLSEND_JIRA_TEAM_FIELD: ${{ vars.FULLSEND_JIRA_TEAM_FIELD || 'customfield_10001' }}
           TARGET_REPO: ${{ github.repository }}
         run: |
           fullsend poll \
@@ -73,6 +69,12 @@ jobs:
   harness:
     name: Harness
     needs: poll
+    permissions:
+      actions: write
+      contents: write
+      id-token: write
+      issues: write
+      pull-requests: write
     uses: fullsend-ai/fullsend/.github/workflows/reusable-dispatch.yml@v0.53.0
     with:
       matrix: ${{ needs.poll.outputs.matrix }}
