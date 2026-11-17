@@ -7,13 +7,9 @@ on:
     - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
+# Least privilege: the poll job only checks out this repository.
 permissions:
-  actions: write
-  contents: write
-  id-token: write
-  issues: write
-  packages: read
-  pull-requests: write
+  contents: read
 
 jobs:
   poll:
@@ -25,6 +21,7 @@ jobs:
       cancel-in-progress: false
     outputs:
       matrix: ${{ steps.build-matrix.outputs.matrix }}
+      tickets: ${{ steps.build-matrix.outputs.tickets }}
     steps:
       - uses: actions/checkout@v4
 
@@ -41,6 +38,7 @@ jobs:
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
           JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+          FULLSEND_JIRA_TEAM_FIELD: ${{ vars.FULLSEND_JIRA_TEAM_FIELD || 'customfield_10001' }}
           TARGET_REPO: ${{ github.repository }}
         run: |
           fullsend poll \
@@ -52,6 +50,33 @@ jobs:
             --output dispatches.json \
             --fullsend-dir .fullsend
 
+      - name: Apply durable Jira attribution
+        env:
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if ! jq -e 'length > 0' dispatches.json > /dev/null 2>&1; then
+            echo "No dispatches; skipping Jira attribution."
+            exit 0
+          fi
+          if [ -z "${JIRA_TOKEN:-}" ] || [ -z "${JIRA_USER_EMAIL:-}" ] || [ -z "${JIRA_BASE_URL:-}" ]; then
+            echo "Jira credentials or base URL not configured; skipping Jira attribution."
+            exit 0
+          fi
+          AUTH=$(printf '%s:%s' "${JIRA_USER_EMAIL}" "${JIRA_TOKEN}" | base64 | tr -d '\r\n')
+          BASE_URL="${JIRA_BASE_URL%/}"
+          TICKETS=$(jq -r '.[] | (.event_payload._normalized_event.entity.key // .FULLSEND_TICKET // empty)' dispatches.json | grep -E '^[A-Z][A-Z0-9]+-[0-9]+$' | sort -u || true)
+          # Additive REST update: PUT /rest/api/3/issue/{issue_key}
+          for ticket in ${TICKETS}; do
+            echo "Applying fullsend-used label to Jira issue ${ticket} (PUT /rest/api/3/issue/${ticket})..."
+            curl -sS -f -X PUT "${BASE_URL}/rest/api/3/issue/${ticket}" \
+              -H "Authorization: Basic ${AUTH}" \
+              -H "Content-Type: application/json" \
+              -d '{"update": {"labels": [{"add": "fullsend-used"}]}}'
+          done
+
       - name: Build dispatch matrix
         id: build-matrix
         run: |
@@ -59,6 +84,7 @@ jobs:
           if ! jq -e 'length > 0' dispatches.json > /dev/null 2>&1; then
             echo "No dispatches."
             echo 'matrix={"include":[]}' >> "${GITHUB_OUTPUT}"
+            echo 'tickets=[]' >> "${GITHUB_OUTPUT}"
             exit 0
           fi
           MATRIX=$(jq -c '{include: .}' dispatches.json)
@@ -69,10 +95,27 @@ jobs:
             echo
             echo "${DELIM}"
           } >> "${GITHUB_OUTPUT}"
+          TICKETS=$(jq -c '[.[] | (.event_payload._normalized_event.entity.key // .FULLSEND_TICKET // empty)] | map(strings | select(test("^[A-Z][A-Z0-9]+-[0-9]+$"))) | unique' dispatches.json)
+          echo "tickets=${TICKETS}" >> "${GITHUB_OUTPUT}"
 
   harness:
     name: Harness
     needs: poll
+    # This caller sets the maximum GITHUB_TOKEN permissions available to the
+    # reusable dispatcher. Its harness-run job receives its own job-scoped token
+    # and cannot elevate beyond this boundary; target-repository writes use a
+    # separately minted Fullsend GitHub App token.
+    permissions:
+      # Required by the pinned harness-run job for its workflow operations.
+      actions: write
+      # Allows the pinned harness-run job to check out the caller repository.
+      contents: read
+      # Allows the pinned harness-run job to exchange its Actions identity for WIF.
+      id-token: write
+      # Allows the pinned harness-run job to publish work-item status to issues.
+      issues: write
+      # Allows the pinned harness-run job to publish work-item status to pull requests.
+      pull-requests: write
     uses: fullsend-ai/fullsend/.github/workflows/reusable-dispatch.yml@v0.53.0
     with:
       matrix: ${{ needs.poll.outputs.matrix }}
@@ -87,3 +130,40 @@ jobs:
       OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
       JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
       JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+
+  reconcile-attribution:
+    name: Reconcile durable attribution
+    needs: [poll, harness]
+    if: always() && needs.poll.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply durable PR attribution
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TICKETS: ${{ needs.poll.outputs.tickets }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TICKETS}" ] || [ "${TICKETS}" = "[]" ]; then
+            echo "No tickets dispatched; skipping PR attribution."
+            exit 0
+          fi
+          gh label create "fullsend-used" \
+            --color "6699CC" \
+            --description "Autonomous Fullsend agent was used on this pull request" \
+            --force 2>/dev/null || true
+          PRS_JSON=$(gh pr list --state all --limit 50 --json number,headRefName,title,body 2>/dev/null || echo "[]")
+          for ticket in $(echo "${TICKETS}" | jq -r '.[]'); do
+            echo "Checking PRs for ticket ${ticket}..."
+            MATCHED_PRS=$(echo "${PRS_JSON}" | jq -r --arg t "${ticket}" '.[] | select((.headRefName // "" | test("(^|[^A-Za-z0-9])" + $t + "($|[^0-9])"; "i")) or (.title // "" | test("(^|[^A-Za-z0-9])" + $t + "($|[^0-9])"; "i")) or (.body // "" | test("(^|[^A-Za-z0-9])" + $t + "($|[^0-9])"; "i"))) | .number' | sort -u || true)
+            for pr_number in ${MATCHED_PRS}; do
+              echo "Applying fullsend-used label to PR #${pr_number}..."
+              gh pr edit "${pr_number}" --add-label "fullsend-used"
+            done
+          done
