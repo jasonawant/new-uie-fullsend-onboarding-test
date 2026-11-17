@@ -10,8 +10,11 @@ on:
         description: OTLP trace ID for verification (32 hexadecimal characters)
         required: true
         type: string
+# Least privilege: this workflow reads the completed Fullsend run and trusted default-branch bridge.
 permissions:
+  # Lists and downloads Fullsend artifacts from the completed workflow run.
   actions: read
+  # Checks out the trusted default-branch Langfuse bridge without write credentials.
   contents: read
 concurrency:
   group: langfuse-${{ github.event.workflow_run.id || github.run_id }}-${{ github.event.workflow_run.run_attempt || github.run_attempt }}
