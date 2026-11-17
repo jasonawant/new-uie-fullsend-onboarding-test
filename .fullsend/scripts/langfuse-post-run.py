@@ -74,12 +74,14 @@ def hydrate_jira_team_from_api(issue_key, env, team_field=None):
     if not re.fullmatch(r"[A-Za-z0-9_]+-\d+", str(issue_key)):
         return None
     team_field = team_field or env.get("FULLSEND_JIRA_TEAM_FIELD") or "customfield_10001"
+    if not re.fullmatch(r"[\w.-]+", str(team_field)):
+        return None
     base_url = env.get("JIRA_BASE_URL") or env.get("FULLSEND_JIRA_URL") or "https://redhat.atlassian.net"
     user_email = env.get("JIRA_USER_EMAIL") or env.get("FULLSEND_JIRA_EMAIL")
     token = env.get("JIRA_TOKEN") or env.get("FULLSEND_JIRA_API_TOKEN")
     if not (base_url and user_email and token):
         return None
-    endpoint = f"{base_url.rstrip('/')}/rest/api/3/issue/{issue_key}?fields={team_field}"
+    endpoint = f"{base_url.rstrip('/')}/rest/api/3/issue/{issue_key}?fields={urllib.parse.quote(str(team_field))}"
     auth = base64.b64encode(f"{user_email}:{token}".encode("utf-8")).decode("ascii")
     headers = {"Authorization": f"Basic {auth}", "Accept": "application/json"}
     req = urllib.request.Request(endpoint, headers=headers, method="GET")
@@ -93,7 +95,20 @@ def hydrate_jira_team_from_api(issue_key, env, team_field=None):
             data = json.loads(resp.read() or b"{}")
             fields = data.get("fields", {}) if isinstance(data, dict) else {}
             return extract_team_value(fields.get(team_field))
-    except Exception:
+    except urllib.error.HTTPError as error:
+        print(
+            f"Jira Team hydration failed for {issue_key} (HTTP {error.code}); "
+            "using repository team fallback.",
+            file=sys.stderr,
+        )
+        return None
+    except Exception as error:
+        # Do not expose URLs, credentials, or upstream error bodies in workflow logs.
+        print(
+            f"Jira Team hydration failed for {issue_key} ({type(error).__name__}); "
+            "using repository team fallback.",
+            file=sys.stderr,
+        )
         return None
 
 
