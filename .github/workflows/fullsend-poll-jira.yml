@@ -105,15 +105,22 @@ jobs:
     # reusable dispatcher. Its harness-run job receives its own job-scoped token
     # and cannot elevate beyond this boundary; target-repository writes use a
     # separately minted Fullsend GitHub App token.
+    #
+    # GitHub Actions statically validates all nested jobs defined in a called
+    # reusable workflow (`reusable-dispatch.yml`) against the calling job's
+    # (`harness`) declared permissions, even if those nested jobs (like `code`
+    # or `fix`) are skipped at runtime during matrix dispatch.
     permissions:
       # Required by the pinned harness-run job for its workflow operations.
       actions: write
-      # Allows the pinned harness-run job to check out the caller repository.
-      contents: read
+      # Code-agent dispatches can commit changes to their working branch.
+      contents: write
       # Allows the pinned harness-run job to exchange its Actions identity for WIF.
       id-token: write
       # Allows the pinned harness-run job to publish work-item status to issues.
       issues: write
+      # The pinned reusable dispatcher may pull its container from GitHub Packages.
+      packages: read
       # Allows the pinned harness-run job to publish work-item status to pull requests.
       pull-requests: write
     uses: fullsend-ai/fullsend/.github/workflows/reusable-dispatch.yml@v0.53.0
