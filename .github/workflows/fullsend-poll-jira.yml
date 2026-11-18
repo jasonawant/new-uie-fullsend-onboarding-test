@@ -67,7 +67,7 @@ jobs:
           fi
           AUTH=$(printf '%s:%s' "${JIRA_USER_EMAIL}" "${JIRA_TOKEN}" | base64 | tr -d '\r\n')
           BASE_URL="${JIRA_BASE_URL%/}"
-          TICKETS=$(jq -r '.[] | (.event_payload._normalized_event.entity.key // .FULLSEND_TICKET // empty)' dispatches.json | grep -E '^[A-Z][A-Z0-9]+-[0-9]+$' | sort -u || true)
+          TICKETS=$(jq -r '.[] | (((.event_payload as $p | $p | try fromjson catch $p) | objects | ._normalized_event.entity.key) // .FULLSEND_TICKET // empty)' dispatches.json | grep -E '^[A-Z][A-Z0-9]+-[0-9]+$' | sort -u || true)
           # Additive REST update: PUT /rest/api/3/issue/{issue_key}
           for ticket in ${TICKETS}; do
             echo "Applying fullsend-used label to Jira issue ${ticket} (PUT /rest/api/3/issue/${ticket})..."
@@ -95,7 +95,7 @@ jobs:
             echo
             echo "${DELIM}"
           } >> "${GITHUB_OUTPUT}"
-          TICKETS=$(jq -c '[.[] | (.event_payload._normalized_event.entity.key // .FULLSEND_TICKET // empty)] | map(strings | select(test("^[A-Z][A-Z0-9]+-[0-9]+$"))) | unique' dispatches.json)
+          TICKETS=$(jq -c '[.[] | (((.event_payload as $p | $p | try fromjson catch $p) | objects | ._normalized_event.entity.key) // .FULLSEND_TICKET // empty)] | map(strings | select(test("^[A-Z][A-Z0-9]+-[0-9]+$"))) | unique' dispatches.json)
           echo "tickets=${TICKETS}" >> "${GITHUB_OUTPUT}"
 
   harness:
