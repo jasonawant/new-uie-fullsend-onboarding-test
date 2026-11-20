@@ -11,8 +11,3 @@ github:
       - triage
       - coder
       - review
-      agents:
-      - name: retro
-        enabled: false
-      - name: prioritize
-        enabled: false
