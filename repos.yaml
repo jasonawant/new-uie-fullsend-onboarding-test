@@ -1,0 +1,18 @@
+version: 1
+defaults:
+  inference:
+    auth: vertex-wif
+github:
+  repos:
+  - name: jasonawant/new-uie-fullsend-onboarding-test
+    config:
+      runtime: pi
+      roles:
+      - triage
+      - coder
+      - review
+      agents:
+      - name: retro
+        enabled: false
+      - name: prioritize
+        enabled: false
