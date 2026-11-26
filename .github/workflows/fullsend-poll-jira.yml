@@ -29,14 +29,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download v0.53.0 --repo fullsend-ai/fullsend \
+          gh release download v0.57.1 --repo fullsend-ai/fullsend \
             -p 'fullsend_*_linux_amd64.tar.gz' -O - | tar xz
           sudo mv fullsend /usr/local/bin/
 
       - name: Poll Jira
         env:
-          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
-          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.FULLSEND_JIRA_TOKEN || secrets.JIRA_TOKEN }}
+          JIRA_USER_EMAIL: ${{ secrets.FULLSEND_JIRA_EMAIL || secrets.JIRA_USER_EMAIL }}
           JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
           FULLSEND_JIRA_TEAM_FIELD: ${{ vars.FULLSEND_JIRA_TEAM_FIELD || 'customfield_10001' }}
           TARGET_REPO: ${{ github.repository }}
@@ -52,8 +52,8 @@ jobs:
 
       - name: Apply durable Jira attribution
         env:
-          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
-          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.FULLSEND_JIRA_TOKEN || secrets.JIRA_TOKEN }}
+          JIRA_USER_EMAIL: ${{ secrets.FULLSEND_JIRA_EMAIL || secrets.JIRA_USER_EMAIL }}
           JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
         run: |
           set -euo pipefail
@@ -123,20 +123,23 @@ jobs:
       packages: read
       # Allows the pinned harness-run job to publish work-item status to pull requests.
       pull-requests: write
-    uses: fullsend-ai/fullsend/.github/workflows/reusable-dispatch.yml@v0.53.0
+    uses: fullsend-ai/fullsend/.github/workflows/reusable-dispatch.yml@v0.57.1
     with:
       matrix: ${{ needs.poll.outputs.matrix }}
       mint_url: ${{ vars.FULLSEND_MINT_URL }}
       gcp_region: ${{ vars.FULLSEND_GCP_REGION }}
       jira_base_url: ${{ vars.JIRA_BASE_URL }}
-      fullsend_version: v0.53.0
+      fullsend_version: v0.57.1
     secrets:
       FULLSEND_GCP_WIF_PROVIDER: ${{ secrets.FULLSEND_GCP_WIF_PROVIDER }}
       FULLSEND_GCP_PROJECT_ID: ${{ secrets.FULLSEND_GCP_PROJECT_ID }}
       OTEL_EXPORTER_OTLP_TRACES_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_TRACES_HEADERS }}
       OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
-      JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
-      JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+      FULLSEND_JIRA_TOKEN: ${{ secrets.FULLSEND_JIRA_TOKEN || secrets.JIRA_TOKEN }}
+      FULLSEND_JIRA_EMAIL: ${{ secrets.FULLSEND_JIRA_EMAIL || secrets.JIRA_USER_EMAIL }}
+      JIRA_TOKEN: ${{ secrets.FULLSEND_JIRA_TOKEN || secrets.JIRA_TOKEN }}
+      JIRA_USER_EMAIL: ${{ secrets.FULLSEND_JIRA_EMAIL || secrets.JIRA_USER_EMAIL }}
+      FULLSEND_TRACE_SIGNING_KEY: ${{ secrets.FULLSEND_TRACE_SIGNING_KEY }}
 
   reconcile-attribution:
     name: Reconcile durable attribution
