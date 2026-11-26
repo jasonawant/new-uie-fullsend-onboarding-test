@@ -2,6 +2,10 @@ version: 1
 defaults:
   inference:
     auth: vertex-wif
+  config:
+    inference:
+      project: firefly-868139
+      wif_provider: projects/275116376890/locations/global/workloadIdentityPools/uie-github-fullsend-inference/providers/gh-repo-1438686685
 github:
   repos:
   - name: jasonawant/new-uie-fullsend-onboarding-test
@@ -11,6 +15,7 @@ github:
       - triage
       - coder
       - review
+      - fix
       agents:
       - name: triage
         source: harness/triage.yaml
@@ -27,7 +32,4 @@ github:
         enabled: false
       - name: prioritize
         enabled: false
-      create_issues:
-        allow_targets:
-          repos:
-          - ixd-firefly/cli-tools/uie-fullsend
+  fullsend_ref: v0.57.1
