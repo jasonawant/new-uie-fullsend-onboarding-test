@@ -53,7 +53,7 @@ jobs:
       issues: write
       packages: read
       pull-requests: write
-    uses: fullsend-ai/fullsend/.github/workflows/reusable-dispatch.yml@v0.57.1  # v0.57.1
+    uses: fullsend-ai/fullsend/.github/workflows/reusable-dispatch.yml@d11de3ea0dde5aa652110b6716c19e000c426df7  # v0.57.1
     with:
       event_action: ${{ github.event.action }}
       mint_url: ${{ vars.FULLSEND_MINT_URL }}
@@ -148,53 +148,3 @@ jobs:
             --add-label "fullsend-no-fix"
           gh pr comment "$PR_NUMBER" --repo "$REPO" \
             --body "Fix agent disabled for this PR. Remove the \`fullsend-no-fix\` label or use \`/fs-fix\` to re-engage."
-
-  # >>> uie-fullsend langfuse-export (managed block: re-run `uie-fullsend langfuse setup` to refresh)
-  # Exports Fullsend telemetry directly to Langfuse when this run has published
-  # fullsend-* telemetry artifacts. Runs after the upstream Fullsend dispatch job.
-  langfuse-export:
-    needs: dispatch
-    if: always() && !cancelled()
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: read   # download artifacts from this run
-      contents: read  # checkout trusted default-branch script
-    steps:
-      - name: Detect Fullsend telemetry artifacts
-        id: telemetry
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          artifacts="$(gh api --paginate "repos/$GH_REPO/actions/runs/$RUN_ID/artifacts?per_page=100" --jq '.artifacts[].name | select(startswith("fullsend-"))')"
-          [ -n "$artifacts" ] && echo "found=true" >> "$GITHUB_OUTPUT" || exit 0
-
-      - name: Checkout Langfuse script
-        if: steps.telemetry.outputs.found == 'true'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          persist-credentials: false
-
-      - name: Download Fullsend artifacts
-        if: steps.telemetry.outputs.found == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run download "${{ github.run_id }}" --pattern 'fullsend-*' --dir "$RUNNER_TEMP/langfuse-artifacts"
-
-      - name: Export Langfuse trace
-        if: steps.telemetry.outputs.found == 'true'
-        env:
-          OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT }}
-          OTEL_EXPORTER_OTLP_TRACES_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_TRACES_HEADERS }}
-          OTEL_RESOURCE_ATTRIBUTES: ${{ vars.OTEL_RESOURCE_ATTRIBUTES }}
-          JIRA_BASE_URL: ${{ vars.JIRA_BASE_URL }}
-          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
-          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
-          FULLSEND_JIRA_TEAM_FIELD: ${{ vars.FULLSEND_JIRA_TEAM_FIELD }}
-          SOURCE_RUN_ID: ${{ github.run_id }}
-          SOURCE_RUN_ATTEMPT: ${{ github.run_attempt }}
-          SOURCE_ACTOR: ${{ github.actor }}
-        run: python3 .fullsend/scripts/langfuse-post-run.py "$RUNNER_TEMP/langfuse-artifacts"
-  # <<< uie-fullsend langfuse-export
