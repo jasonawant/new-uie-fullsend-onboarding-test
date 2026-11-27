@@ -139,7 +139,6 @@ jobs:
       FULLSEND_JIRA_EMAIL: ${{ secrets.FULLSEND_JIRA_EMAIL || secrets.JIRA_USER_EMAIL }}
       JIRA_TOKEN: ${{ secrets.FULLSEND_JIRA_TOKEN || secrets.JIRA_TOKEN }}
       JIRA_USER_EMAIL: ${{ secrets.FULLSEND_JIRA_EMAIL || secrets.JIRA_USER_EMAIL }}
-      FULLSEND_TRACE_SIGNING_KEY: ${{ secrets.FULLSEND_TRACE_SIGNING_KEY }}
 
   reconcile-attribution:
     name: Reconcile durable attribution

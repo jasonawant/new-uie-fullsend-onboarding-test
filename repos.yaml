@@ -32,4 +32,11 @@ github:
         enabled: false
       - name: prioritize
         enabled: false
+      tracker:
+        jira:
+          base_url: https://redhat.atlassian.net
+          project: FRFLY
+          allowed_targets:
+            projects:
+            - FRFLY
   fullsend_ref: v0.57.1
